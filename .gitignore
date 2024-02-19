@@ -1,3 +1,4 @@
 **/.streamlit/
 .streamlit
 prototyping
+__pycache__
