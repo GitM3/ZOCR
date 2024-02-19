@@ -4,8 +4,19 @@ from PIL import Image
 import ZOCR_SCAN as zs 
 from streamlit_gsheets import GSheetsConnection
 import gspread
+import re
 
-
+def process_text(text):
+    pattern = r'R\d+\.\d+'
+    rows = list()
+    for item in text:
+        st.write(item)
+        match = re.search(pattern,item)
+        if match:
+            prefix = item[:match.start()]
+            value = match.group(0)
+            st.write("Prefix:", repr(prefix))
+            st.write("Matched Value:", repr(value))
 
 def append_to_db(rows):
     # conn.update(
@@ -17,6 +28,7 @@ def append_to_db(rows):
     spreadsheet = gc.open_by_url("https://docs.google.com/spreadsheets/d/1JrjyQG9aJStzoSNkTOrZQvYPh-y1GqV7gDE3f9Jgcr0/edit#gid=243609202")
     worksheet = spreadsheet.worksheet("Test")
     worksheet.append_rows([rows])
+    print(rows)
     return  
 
 def main():
@@ -41,7 +53,7 @@ def main():
             st.image(borderedImage,caption="Detected Receipt",use_column_width=True)
             st.write(text)
             st.success("Receipt outline found!")
-            write_to_db(text)
+            process_text(text)
 
         except Exception as e:
             st.error(str(e))
