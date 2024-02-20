@@ -6,17 +6,39 @@ from streamlit_gsheets import GSheetsConnection
 import gspread
 import re
 
+
+
 def process_text(text):
-    pattern = r'R\d+\.\d+'
     rows = list()
     for item in text:
-        st.write(item)
-        match = re.search(pattern,item)
+        match = re.search(r'R(\d+\.\d+)',item)
         if match:
-            prefix = item[:match.start()]
-            value = match.group(0)
-            st.write("Prefix:", repr(prefix))
-            st.write("Matched Value:", repr(value))
+            # Check negatives: places like checkers use this to mark specials
+            negative_match = re.search(r'\-R(\d+\.\d+)',item)
+            if negative_match:
+                # subtract from previous item: assuming never first
+                # But then don't add to row, just note special/saving
+                rows[-1][1] = rows[-1][1] - float(negative_match.group(1))
+                rows[-1][0] = rows[-1][0] + "SPECIAL"
+            else:
+                prefix = item[:match.start()].rstrip()
+                value = float(match.group(1))
+                #print(prefix," : ", value)
+                if prefix.upper() != "TOTAL":
+                    rows.append([prefix,value])
+        else:
+            print("eish")
+            # Handle No match
+            # Check if bussiness name: auto matically add skip name setting
+    if rows:
+        location = st.text_input("Enter Store Name")
+    if location:
+        _ = [row.append(location) for row in rows]
+        btn = st.button("Submit")
+        if btn:
+            append_to_db(rows)
+            st.session_state['upload'] = False
+    return    
 
 def append_to_db(rows):
     # conn.update(
@@ -27,13 +49,15 @@ def append_to_db(rows):
     gc = gspread.service_account(".streamlit/happy.json")
     spreadsheet = gc.open_by_url("https://docs.google.com/spreadsheets/d/1JrjyQG9aJStzoSNkTOrZQvYPh-y1GqV7gDE3f9Jgcr0/edit#gid=243609202")
     worksheet = spreadsheet.worksheet("Test")
-    worksheet.append_rows([rows])
+    worksheet.append_rows(rows)
     print(rows)
     return  
 
 def main():
-    # Set the title of the app
+    
     st.title("ZOCR")
+    if 'key' not in st.session_state:
+        st.session_state['upload'] = False
     # picture = st.camera_input("Take a picture")
     # if picture:
     #     st.image(picture)
@@ -45,7 +69,8 @@ def main():
     #df = sheet_connection.read()
 
     uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
-    if uploaded_file is not None:
+    if uploaded_file is not None and st.session_state['upload']== False:
+        st.session_state['upload'] = True
         image = Image.open(uploaded_file)
         image = np.array(image)
         try:
@@ -54,7 +79,6 @@ def main():
             st.write(text)
             st.success("Receipt outline found!")
             process_text(text)
-
         except Exception as e:
             st.error(str(e))
 
